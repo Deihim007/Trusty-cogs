@@ -102,7 +102,7 @@ class EventPoster(commands.Cog):
             for msg_id in to_remove:
                 ctx = await events[msg_id].get_ctx(self.bot)
                 if ctx:
-                    await events[msg_id].edit(ctx, content=_("This event has ended."))
+                    await events[msg_id].edit(ctx, content=_("**عضو گیری اونت به پایان رسیده است**"))
 
                 async with self.config.guild_from_id(guild_id).events() as guild_events:
                     del guild_events[str(events[msg_id].hoster)]
@@ -173,7 +173,7 @@ class EventPoster(commands.Cog):
                     event = Event.from_json(self.bot, events[str(user.id)])
                     ctx = await event.get_ctx(self.bot)
                     if ctx:
-                        await event.edit(ctx, content=_("This event has ended."))
+                        await event.edit(ctx, content=_("**عضو گیری اونت به پایان رسیده است**"))
                     del events[str(user.id)]
                     del self.event_cache[guild.id][event.message]
                 return
@@ -358,7 +358,7 @@ class EventPoster(commands.Cog):
                 to_del = []
                 for message_id, event in self.event_cache[ctx.guild.id].items():
                     if event.hoster == ctx.author.id:
-                        await event.edit(ctx, content=_("This event has ended."))
+                        await event.edit(ctx, content=_("**عضو گیری اونت به پایان رسیده است**"))
                         to_del.append(event.message)
                     async with self.config.guild(ctx.guild).events() as cur_events:
 
@@ -459,7 +459,7 @@ class EventPoster(commands.Cog):
         else:
             async with self.config.guild(ctx.guild).events() as events:
                 event = Event.from_json(self.bot, events[str(ctx.author.id)])
-                await event.edit(ctx, content=_("This event has ended."))
+                await event.edit(ctx, content=_("**عضو گیری اونت به پایان رسیده است**"))
                 del events[str(ctx.author.id)]
                 del self.event_cache[ctx.guild.id][event.message]
             await ctx.tick()
@@ -915,7 +915,7 @@ class EventPoster(commands.Cog):
                 event = self.event_cache[ctx.guild.id][hoster_or_message.id]
             except KeyError:
                 return await ctx.send(_("I could not find an event under that message."))
-            await event.edit(ctx, content=_("This event has ended."))
+            await event.edit(ctx, content=_("**عضو گیری اونت به پایان رسیده است**"))
             async with self.config.guild(ctx.guild).events() as cur_events:
                 try:
                     del cur_events[str(event.hoster)]

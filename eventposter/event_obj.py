@@ -218,9 +218,9 @@ class Event:
     async def make_event_embed(self, ctx: commands.Context) -> discord.Embed:
         hoster = ctx.guild.get_member(self.hoster)
         em = discord.Embed()
-        em.set_author(
-            name=_("{hoster} is hosting").format(hoster=hoster), icon_url=hoster.avatar_url
-        )
+        # em.set_author(
+        #     name=_("{hoster} is hosting").format(hoster=hoster), icon_url=hoster.avatar_url
+        # )
         try:
             prefixes = await ctx.bot.get_valid_prefixes(ctx.guild)
             prefix = prefixes[0]
@@ -232,16 +232,14 @@ class Event:
             slots = self.max_slots - len(self.members)
             if slots < 0:
                 slots = 0
-            max_slots_msg = _("**{slots} slots available.**").format(slots=slots)
+            max_slots_msg = _("**{slots} ظرفیت باقی مانده.**").format(slots=slots)
 
         em.description = _(
-            "**{description}**\n\nTo join this event type "
-            "`{prefix}join {hoster}` or react to this message with "
-            "\N{WHITE HEAVY CHECK MARK}\n\n{max_slots_msg} "
+            "**{description}**\nبرای شرکت در اونت {WHITE HEAVY CHECK MARK} را فشار دهید!"
         ).format(
             description=self.event[:1024],
-            prefix=prefix,
-            hoster=hoster,
+            # prefix=prefix,
+            # hoster=hoster,
             max_slots_msg=max_slots_msg,
         )
         player_list = ""
@@ -252,18 +250,18 @@ class Event:
             mem = ctx.guild.get_member(member)
             if has_player_class:
                 player_class = f" - {has_player_class}"
-            player_list += _("**Slot {slot_num}**\n{member}{player_class}\n").format(
+            player_list += _("**ظرفیت {slot_num}**\n{member}{player_class}\n").format(
                 slot_num=i + 1, member=mem.mention, player_class=player_class
             )
         for page in pagify(player_list, page_length=1024):
-            em.add_field(name=_("Attendees"), value=page)
+            em.add_field(name=_("شرکت کنندگان"), value=page)
         if self.maybe and len(em.fields) < 25:
             maybe = [f"<@!{m}>" for m in self.maybe]
-            em.add_field(name=_("Maybe"), value=humanize_list(maybe))
+            em.add_field(name=_("شاید بیام"), value=humanize_list(maybe))
         if self.approver:
             approver = ctx.guild.get_member(self.approver)
             em.set_footer(
-                text=_("Approved by {approver}").format(approver=approver),
+                text=_("تایید توسط {approver}").format(approver=approver),
                 icon_url=approver.avatar_url,
             )
         start = await self.start_time()
