@@ -250,7 +250,7 @@ class Event:
             mem = ctx.guild.get_member(member)
             if has_player_class:
                 player_class = f" - {has_player_class}"
-            player_list += _("**ظرفیت {slot_num}**\n{member}{player_class}\n").format(
+            player_list += _("**نفر {slot_num}**\n{member}{player_class}\n").format(
                 slot_num=i + 1, member=mem.mention, player_class=player_class
             )
         for page in pagify(player_list, page_length=1024):
