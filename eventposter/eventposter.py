@@ -22,7 +22,7 @@ _ = Translator("EventPoster", __file__)
 EVENT_EMOJIS = [
     "\N{WHITE HEAVY CHECK MARK}",
     "\N{NEGATIVE SQUARED CROSS MARK}",
-    "\N{WHITE QUESTION MARK ORNAMENT}",
+    # "\N{WHITE QUESTION MARK ORNAMENT}",
 ]
 
 
@@ -164,8 +164,8 @@ class EventPoster(commands.Cog):
         event = self.event_cache[payload.guild_id][payload.message_id]
         if str(payload.emoji) == "\N{WHITE HEAVY CHECK MARK}":
             await self.add_user_to_event(user, event)
-        if str(payload.emoji) == "\N{WHITE QUESTION MARK ORNAMENT}":
-            await self.add_user_to_maybe(user, event)
+        # if str(payload.emoji) == "\N{WHITE QUESTION MARK ORNAMENT}":
+        #     await self.add_user_to_maybe(user, event)
         if str(payload.emoji) == "\N{NEGATIVE SQUARED CROSS MARK}":
             if user.id == event.hoster:
 
@@ -202,11 +202,11 @@ class EventPoster(commands.Cog):
                 return
             if user.id not in event.maybe:
                 await self.remove_user_from_event(user, event)
-        if str(payload.emoji) == "\N{WHITE QUESTION MARK ORNAMENT}":
-            if user.id == event.hoster:
-                return
-            if user.id not in event.members:
-                await self.remove_user_from_event(user, event)
+        # if str(payload.emoji) == "\N{WHITE QUESTION MARK ORNAMENT}":
+        #     if user.id == event.hoster:
+        #         return
+        #     if user.id not in event.members:
+        #         await self.remove_user_from_event(user, event)
 
     async def add_user_to_event(self, user: discord.Member, event: Event) -> None:
         if user.id in event.members:
