@@ -235,7 +235,7 @@ class Event:
             max_slots_msg = _("**{slots} ظرفیت باقی مانده.**").format(slots=slots)
 
         em.description = _(
-            "**{description}**\nبرای شرکت در اونت {WHITE HEAVY CHECK MARK} را فشار دهید!"
+            "**{description}**\nبرای شرکت در اونت \N{WHITE HEAVY CHECK MARK} را فشار دهید!"
         ).format(
             description=self.event[:1024],
             # prefix=prefix,
