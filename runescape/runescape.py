@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Literal, Optional
 
 import aiohttp
@@ -31,7 +31,7 @@ class Runescape(commands.Cog):
     """
 
     __author__ = ["TrustyJAID"]
-    __version__ = "1.3.1"
+    __version__ = "1.3.3"
 
     def __init__(self, bot):
         self.bot: Red = bot
@@ -67,7 +67,11 @@ class Runescape(commands.Cog):
     @tasks.loop(seconds=60)
     async def check_new_metrics(self):
         for username, activities in self.metrics.items():
-            data = await self.get_profile(username, 20)
+            try:
+                data = await self.get_profile(username, 20)
+            except Exception:
+                log.exception("Error pulling profile info for %s", username)
+                continue
             for activity in reversed(data.activities):
                 if activity.id not in activities.posted_activities:
                     await self.post_activity(data, activities.channels, activity)
@@ -139,6 +143,97 @@ class Runescape(commands.Cog):
     async def osrs(self, ctx: commands.Context) -> None:
         """Search for OSRS highscores"""
         pass
+
+    @runescape.command(name="wiki")
+    async def runescape_wiki(self, ctx: commands.Context, *, search: str):
+        """Look for something on the runescape Wiki."""
+        base_url = "https://runescape.wiki/w/?curid="
+        wiki_url = "https://runescape.wiki/api.php"
+        params = {
+            "action": "query",
+            "list": "search",
+            "srsearch": search,
+            "format": "json",
+        }
+        headers = {"User-Agent": f"Red-DiscordBot Trusty-cogs wiki lookup on {self.bot.user}"}
+        async with self.session.get(wiki_url, headers=headers, params=params) as r:
+            if r.status == 200:
+                data = await r.json()
+            else:
+                await ctx.send(f"I could not find information about `{search}` on the Runescape Wiki.")
+                return
+        msg = f"Runescape Wiki Results for `{search}`:\n"
+        for search in data["query"]["search"]:
+            page_id = search["pageid"]
+            title = search['title']
+            msg += f"[{title}]({base_url}{page_id})\n"
+        await ctx.maybe_send_embed(msg)
+
+    @runescape.command(name="nemiforest", aliases=["nemi", "forest"])
+    async def runescape_nemiforest(self, ctx: commands.Context):
+        """Display an image of a Nemi Forest instance with all nine nodes."""
+        async with ctx.typing():
+            subreddit_url = "https://api.reddit.com/r/nemiforest/new"
+            params = {
+                "limit": 1,
+            }
+            headers = {"User-Agent": f"Red-DiscordBot Trusty-cogs subreddit lookup on {self.bot.user}"}
+            async with self.session.get(subreddit_url, headers=headers, params=params) as r:
+                if r.status == 200:
+                    data = await r.json()
+                else:
+                    await ctx.send(
+                        "I could not find any Nemi Forest instance. Reddit is probably down."
+                    )
+                    return
+
+            reddit_icon_url = "https://www.redditinc.com/assets/images/site/reddit-logo.png"
+            latest_post: Dict = data["data"]["children"][0]["data"]
+            post_author: str = latest_post["author"]
+            post_flair = latest_post["link_flair_text"]
+            post_title: str = (
+                latest_post["title"]
+                if not post_flair
+                else f"[Depleted] " + latest_post["title"]
+            )
+            post_url: str = latest_post["url"]
+            post_time = int(latest_post["created_utc"])
+
+            embed_color = await ctx.embed_color()
+            embed = discord.Embed(
+                title=post_title, description=f"<t:{post_time}:R>", color=embed_color
+            )
+            embed.set_image(url=post_url)
+            embed.set_footer(
+                text=f"Instance provided by {post_author} via r/NemiForest",
+                icon_url=reddit_icon_url,
+            )
+        await ctx.send(embed=embed)
+
+    @osrs.command(name="wiki")
+    async def osrs_wiki(self, ctx: commands.Context, *, search: str):
+        """Look for something on the runescape Wiki."""
+        base_url = "https://oldschool.runescape.wiki/w/?curid="
+        wiki_url = "https://oldschool.runescape.wiki/api.php"
+        params = {
+            "action": "query",
+            "list": "search",
+            "srsearch": search,
+            "format": "json",
+        }
+        headers = {"User-Agent": f"Red-DiscordBot Trusty-cogs wiki lookup on {self.bot.user}"}
+        async with self.session.get(wiki_url, headers=headers, params=params) as r:
+            if r.status == 200:
+                data = await r.json()
+            else:
+                await ctx.send(f"I could not find information about `{search}` on the Runescape Wiki.")
+                return
+        msg = f"Old School Runescape Wiki Results for `{search}`:\n"
+        for search in data["query"]["search"]:
+            page_id = search["pageid"]
+            title = search['title']
+            msg += f"[{title}]({base_url}{page_id})\n"
+        await ctx.maybe_send_embed(msg)
 
     @osrs.command(name="stats")
     async def osrs_stats(self, ctx: commands.Context, runescape_name: str = None) -> None:
@@ -361,6 +456,25 @@ class Runescape(commands.Cog):
             return
         skills = await self.stats_message(data)
         await ctx.maybe_send_embed(skills)
+
+    @runescape.command()
+    async def reset(self, ctx: commands.Context) -> None:
+        """Show Runescapes Daily, Weekly, and Monthly reset times."""
+        today = datetime.now(timezone.utc).replace(minute=0)
+        daily = today + timedelta(hours=((0 - today.hour) % 24))
+        weekly = daily + timedelta(days=((2 - daily.weekday()) % 7))
+        monthly = datetime(
+            year=daily.year, month=daily.month, day=28, hour=0, tzinfo=timezone.utc
+        ) + timedelta(days=4)
+        weekly_reset_str = int(weekly.timestamp())
+        daily_reset_str = int(daily.timestamp())
+        monthly_reset_str = int(monthly.timestamp())
+        msg = (
+            "Daily Reset is <t:{daily}:R> (<t:{daily}>).\n"
+            "Weekly reset is <t:{weekly}:R> (<t:{weekly}>).\n"
+            "Monthly Reset is <t:{month}:R> (<t:{month}>)."
+        ).format(weekly=weekly_reset_str, daily=daily_reset_str, month=monthly_reset_str)
+        await ctx.send(msg)
 
     async def stats_message(self, p: Profile) -> str:
         table = str(p)

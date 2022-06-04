@@ -14,7 +14,7 @@ from redbot.core.utils.chat_formatting import humanize_list, humanize_number, pa
 
 from .menus import BaseMenu, TweetListPages, TweetPages, TweetsMenu
 from .tweet_entry import ChannelData, TweetEntry
-from .tweets_api import TweetsAPI
+from .tweets_api import MissingTokenError, TweetsAPI
 
 _ = Translator("Tweets", __file__)
 
@@ -28,7 +28,7 @@ class Tweets(TweetsAPI, commands.Cog):
     """
 
     __author__ = ["Palm__", "TrustyJAID"]
-    __version__ = "2.7.2"
+    __version__ = "2.8.3"
 
     def __init__(self, bot):
         self.bot = bot
@@ -128,11 +128,16 @@ class Tweets(TweetsAPI, commands.Cog):
         """
         try:
             api = await self.authenticate()
+        except MissingTokenError as e:
+            await e.send_error(ctx)
+            return
+        try:
+
             if ctx.message.attachments != []:
                 temp = BytesIO()
                 filename = ctx.message.attachments[0].filename
                 await ctx.message.attachments[0].save(temp)
-                api.update_with_media(filename, status=message, file=temp)
+                api.update_status_with_media(filename, status=message, file=temp)
             else:
                 api.update_status(message)
         except Exception:
@@ -150,9 +155,13 @@ class Tweets(TweetsAPI, commands.Cog):
         different trend information from that location
         default is `United States`
         """
-        api = await self.authenticate()
         try:
-            fake_task = functools.partial(api.trends_available)
+            api = await self.authenticate()
+        except MissingTokenError as e:
+            await e.send_error(ctx)
+            return
+        try:
+            fake_task = functools.partial(api.available_trends)
             task = self.bot.loop.run_in_executor(None, fake_task)
             location_list = await asyncio.wait_for(task, timeout=10)
         except asyncio.TimeoutError:
@@ -168,7 +177,7 @@ class Tweets(TweetsAPI, commands.Cog):
             await ctx.send("{} Is not a correct location!".format(location))
             return
         try:
-            fake_task = functools.partial(api.trends_place, country_id["woeid"])
+            fake_task = functools.partial(api.get_place_trends, country_id["woeid"])
             task = self.bot.loop.run_in_executor(None, fake_task)
             trends = await asyncio.wait_for(task, timeout=10)
         except asyncio.TimeoutError:
@@ -205,12 +214,12 @@ class Tweets(TweetsAPI, commands.Cog):
     async def get_twitter_user(self, username: str) -> tweepy.User:
         try:
             api = await self.authenticate()
-            fake_task = functools.partial(api.get_user, username)
+            fake_task = functools.partial(api.get_user, screen_name=username)
             task = self.bot.loop.run_in_executor(None, fake_task)
             user = await asyncio.wait_for(task, timeout=10)
         except asyncio.TimeoutError:
             raise
-        except tweepy.error.TweepError:
+        except tweepy.errors.TweepyException:
             raise
         return user
 
@@ -222,7 +231,7 @@ class Tweets(TweetsAPI, commands.Cog):
         except asyncio.TimeoutError:
             await ctx.send(_("Looking up the user timed out."))
             return
-        except tweepy.error.TweepError:
+        except tweepy.errors.TweepyException:
             await ctx.send(_("{username} could not be found.").format(username=username))
             return
         profile_url = "https://twitter.com/" + user.screen_name
@@ -256,7 +265,11 @@ class Tweets(TweetsAPI, commands.Cog):
         Display a users tweets as a scrollable message
         """
         async with ctx.typing():
-            api = await self.authenticate()
+            try:
+                api = await self.authenticate()
+            except MissingTokenError as e:
+                await e.send_error(ctx)
+                return
         await TweetsMenu(
             source=TweetPages(api=api, username=username, loop=ctx.bot.loop), cog=self
         ).start(ctx=ctx)
@@ -310,10 +323,10 @@ class Tweets(TweetsAPI, commands.Cog):
         *usernames: str,
     ) -> None:
         """
-        Set an accounts retweets being posted
+        Set whether to use custom embeds or just post the tweet url
 
         `<channel>` The channel the usernames are posting in
-        `<true_or_false>` `true` if you want retweets to be displayed or `false` if not.
+        `<true_or_false>` `true` if you want custom embeds to be used or `false` if not.
         `[usernames...]` The usernames you want to edit the replies setting for.
         This must be the users @handle with spaces signifying a different account.
         """
@@ -351,6 +364,8 @@ class Tweets(TweetsAPI, commands.Cog):
                 verb=_("will") if true_or_false else _("will not"),
                 replies=humanize_list(added_replies),
             )
+        else:
+            msg = _("No accouts were found in {channel}.").format(channel=channel.mention)
         await ctx.send(msg)
 
     @_autotweet.command(name="restart")
@@ -409,6 +424,8 @@ class Tweets(TweetsAPI, commands.Cog):
                 verb=_("will") if true_or_false else _("will not"),
                 replies=humanize_list(added_replies),
             )
+        else:
+            msg = _("No accounts were found in {channel}.").format(channel=channel.mention)
         await ctx.send(msg)
 
     @_autotweet.command(name="retweets")
@@ -461,6 +478,8 @@ class Tweets(TweetsAPI, commands.Cog):
                 verb=_("will") if true_or_false else _("will not"),
                 replies=humanize_list(added_replies),
             )
+        else:
+            msg = _("No accounts were found in {channel}.").format(channel=channel.mention)
         await ctx.send(msg)
 
     @_autotweet.command(name="add")
@@ -483,7 +502,7 @@ class Tweets(TweetsAPI, commands.Cog):
             msg = _("Looking up user timed out")
             await ctx.send(msg)
             return
-        except tweepy.TweepError as e:
+        except tweepy.errors.TweepyException as e:
             msg = _("Whoops! Something went wrong here. The error code is ") + f"{e} {username}"
             log.error(msg, exc_info=True)
             await ctx.send(_("That username does not exist."))
@@ -595,7 +614,7 @@ class Tweets(TweetsAPI, commands.Cog):
         cursor = -1
         list_members: list = []
         for member in tweepy.Cursor(
-            api.list_members, owner_screen_name=owner, slug=list_name, cursor=cursor
+            api.get_list_members, owner_screen_name=owner, slug=list_name, cursor=cursor
         ).items():
             list_members.append(member)
         return list_members
@@ -616,7 +635,11 @@ class Tweets(TweetsAPI, commands.Cog):
         `list_name` is the name of the list
         `channel` is the channel where the tweets will be posted
         """
-        api = await self.authenticate()
+        try:
+            api = await self.authenticate()
+        except MissingTokenError as e:
+            await e.send_error(ctx)
+            return
         try:
             fake_task = functools.partial(
                 self.get_tweet_list, api=api, owner=owner, list_name=list_name
@@ -664,7 +687,7 @@ class Tweets(TweetsAPI, commands.Cog):
             for page in pagify(msg_send, ["\n"]):
                 await ctx.send(page)
             command = f"`{ctx.prefix}autotweet restart`"
-            msg = _("Now do {commant} when you've finished adding all accounts!").format(
+            msg = _("Now do {command} when you've finished adding all accounts!").format(
                 command=command
             )
             await ctx.send(msg)
@@ -692,7 +715,11 @@ class Tweets(TweetsAPI, commands.Cog):
         `list_name` is the name of the list
         `channel` is the channel where the tweets will be posted
         """
-        api = await self.authenticate()
+        try:
+            api = await self.authenticate()
+        except MissingTokenError as e:
+            await e.send_error(ctx)
+            return
         try:
             fake_task = functools.partial(
                 self.get_tweet_list, api=api, owner=owner, list_name=list_name
@@ -786,7 +813,11 @@ class Tweets(TweetsAPI, commands.Cog):
         If `username` is not provided all users posting in the provided channel
         will be removed.
         """
-        api = await self.authenticate()
+        try:
+            api = await self.authenticate()
+        except MissingTokenError as e:
+            await e.send_error(ctx)
+            return
         user_id: Optional[int] = None
         screen_name: Optional[str] = None
         if username:
@@ -794,7 +825,7 @@ class Tweets(TweetsAPI, commands.Cog):
                 for status in tweepy.Cursor(api.user_timeline, id=username).items(1):
                     user_id = status.user.id
                     screen_name = status.user.screen_name
-            except tweepy.TweepError as e:
+            except tweepy.errors.TweepyException as e:
                 msg = (
                     _("Whoops! Something went wrong here. The error code is ") + f"{e} {username}"
                 )
@@ -840,6 +871,7 @@ class Tweets(TweetsAPI, commands.Cog):
         ctx: commands.Context,
     ) -> None:
         """How to get and set your twitter API tokens."""
+        elevated = "[elevated access](https://developer.twitter.com/en/docs/twitter-api/getting-started/about-twitter-api#Access)"
         msg = _(
             "1. Visit https://apps.twitter.com and apply for a developer account.\n"
             "2. Once your account is approved Create a standalone app and copy the "
@@ -847,9 +879,11 @@ class Tweets(TweetsAPI, commands.Cog):
             "3. On the standalone apps page select regenerate **Access Token and Secret** "
             "and copy those somewhere safe.\n\n"
             "4. Do `[p]set api twitter "
+            "bearer_token YOUR_BEARER_TOKEN "
             "consumer_key YOUR_CONSUMER_KEY "
             "consumer_secret YOUR_CONSUMER_SECRET "
             "access_token YOUR_ACCESS_TOKEN "
-            "access_secret YOUR_ACCESS_SECRET`"
-        )
+            "access_secret YOUR_ACCESS_SECRET`\n\n"
+            "**Note:** You will require {elevated} to use everything in this cog."
+        ).format(elevated=elevated)
         await ctx.maybe_send_embed(msg)

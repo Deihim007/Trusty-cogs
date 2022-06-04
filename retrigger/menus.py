@@ -94,6 +94,7 @@ class ReTriggerPages(menus.ListPageSource):
             "__Author__: {author}\n"
             "__Count__: **{count}**\n"
             "__Response__: **{response}**\n"
+            "__NSFW__: **{nsfw}**\n"
         )
         if embeds:
             info = info.format(
@@ -102,6 +103,7 @@ class ReTriggerPages(menus.ListPageSource):
                 author=author.mention,
                 count=trigger.count,
                 response=responses,
+                nsfw=trigger.nsfw,
             )
         else:
             info = info.format(
@@ -110,6 +112,7 @@ class ReTriggerPages(menus.ListPageSource):
                 author=author.name,
                 count=trigger.count,
                 response=responses,
+                nsfw=trigger.nsfw,
             )
         text_response = ""
         if trigger.ignore_commands:
@@ -127,7 +130,7 @@ class ReTriggerPages(menus.ListPageSource):
             )
         if "rename" in trigger.response_type:
             if trigger.multi_payload:
-                response = "\n".join(t[1] for t in trigger.multi_payload if t[0] == "text")
+                response = "\n".join(t[1] for t in trigger.multi_payload if t[0] == "rename")
             else:
                 response = trigger.text
             info += _("__Rename__: ") + "**{response}**\n".format(response=response)
@@ -198,7 +201,9 @@ class ReTriggerPages(menus.ListPageSource):
         if trigger.check_edits:
             info += _("__Checking edits__: **Enabled**\n")
         if trigger.delete_after:
-            info += _("__Message deleted after__: {time} seconds.\n").format(time=trigger.delete_after)
+            info += _("__Message deleted after__: {time} seconds.\n").format(
+                time=trigger.delete_after
+            )
         if trigger.read_filenames:
             info += _("__Read filenames__: **Enabled**\n")
         if trigger.user_mention:

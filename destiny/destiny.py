@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Literal, Optional, Union
 
 import discord
+import pytz
 from redbot.core import Config, checks, commands
 from redbot.core.i18n import Translator, cog_i18n
 from redbot.core.utils.chat_formatting import (
@@ -708,6 +709,36 @@ class Destiny(DestinyAPI, commands.Cog):
 
                 msg += f"**{name}:** {description}\n{extras}\n"
         await ctx.send_interactive(pagify(msg))
+
+    @destiny.command(name="reset")
+    async def destiny_reset_time(self, ctx: commands.Context):
+        """
+        Show approximately when Weekyl and Daily reset is
+        """
+        today = datetime.datetime.now(datetime.timezone.utc)
+        tuesday = today + datetime.timedelta(days=((1 - today.weekday()) % 7))
+        weekly = datetime.datetime(
+            year=tuesday.year,
+            month=tuesday.month,
+            day=tuesday.day,
+            hour=17,
+            tzinfo=datetime.timezone.utc,
+        )
+        reset_time = today + datetime.timedelta(hours=((17 - today.hour) % 24))
+        daily = datetime.datetime(
+            year=reset_time.year,
+            month=reset_time.month,
+            day=reset_time.day,
+            hour=reset_time.hour,
+            tzinfo=datetime.timezone.utc,
+        )
+        weekly_reset_str = int(weekly.timestamp())
+        daily_reset_str = int(daily.timestamp())
+        msg = _(
+            "Weekly reset is <t:{weekly}:R> (<t:{weekly}>).\n"
+            "Daily Reset is <t:{daily}:R> (<t:{daily}>)."
+        ).format(weekly=weekly_reset_str, daily=daily_reset_str)
+        await ctx.send(msg)
 
     @destiny.command(hidden=True)
     @commands.bot_has_permissions(embed_links=True)

@@ -511,7 +511,7 @@ class Game:
         if self.game_state == "Live":
             # Checks what the period is and posts the game is starting in the appropriate channel
 
-            if home["period"] != self.period:
+            if home["period"] != self.period or "Preview" in home["game_state"]:
                 log.debug(
                     "**%s Period starting %s at %s**",
                     self.period_ord,
@@ -654,7 +654,7 @@ class Game:
                     allowed_mentions = {"allowed_mentions": discord.AllowedMentions(roles=True)}
                 else:
                     allowed_mentions = {"allowed_mentions": discord.AllowedMentions(roles=False)}
-            if self.game_state == "R" and "OT" in self.period_ord:
+            if self.game_type == "R" and "OT" in self.period_ord:
                 if not guild_settings["ot_notifications"]:
                     if version_info >= VersionInfo.from_str("3.4.0"):
                         allowed_mentions = {
